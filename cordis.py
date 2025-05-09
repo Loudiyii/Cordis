@@ -114,7 +114,6 @@ st.markdown(f"⏳ Projet le + long : **{proj_longest['title']}** (ID {proj_longe
 st.subheader("📈 Financement UE par année")
 df_year = df_proj.groupby('startyear', as_index=False).agg(year_ec=('ecmaxcontribution', 'sum'))
 fig1 = px.bar(
-    df_year,
     x='startyear',
     y='year_ec',
     title="Financement UE par année",
