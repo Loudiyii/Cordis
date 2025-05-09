@@ -102,7 +102,7 @@ if 'keywords' in df.columns:
 st.subheader("🔢 Indicateurs clés")
 c1, c2, c3, c4= st.columns(4)
 c1.metric("# Projets", num_projects)
-c2.metric("Financement EC (€)", f"{sum_ecfunding:,.0f}")
+c2.metric("Financement EU (€)", f"{sum_ecfunding:,.0f}")
 c3.metric("Total Cost (€)", f"{sum_totalcost:,.0f}")
 if missing_keywords_pct is not None:
     c4.metric("% Projets sans mots-clés", f"{missing_keywords_pct:.1f}%")
