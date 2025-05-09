@@ -97,12 +97,13 @@ most_common_id = df['id'].value_counts().idxmax()
 nb_occurrences = df['id'].value_counts().max()
 proj_title_most_common = df[df['id'] == most_common_id]['title'].iloc[0] if 'title' in df.columns else "(titre non dispo)"
 
-# 📊 Affichage KPIs
 st.subheader("🔢 Indicateurs clés")
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4= st.columns(4)
 c1.metric("# Projets", num_projects)
 c2.metric("Financement EC (€)", f"{sum_ecfunding:,.0f}")
 c3.metric("Total Cost (€)", f"{sum_totalcost:,.0f}")
+if missing_keywords_pct is not None:
+    c4.metric("% Projets sans mots-clés", f"{missing_keywords_pct:.1f}%")
 
 st.markdown(f"👥 Projet avec le plus de lignes (partenaires) : **{proj_title_most_common}** (ID {most_common_id}) — {nb_occurrences} lignes")
 st.markdown(f"- Moy. EU fund : **{avg_ecfunding:,.0f} €**, Médiane : **{med_ecfunding:,.0f} €**")
