@@ -9,7 +9,7 @@ st.caption("⚠️ Chargement en cours, merci de patienter 🙏")
 
 # 📂 Choix du fichier source
 dataset_choice = st.sidebar.radio("📁 Sélection du dataset :", [
-    "CORDIS - Projets Siren en commun avec ANR",
+    "CORDIS - Organismes financé par EU/FR",
     "CORDIS - Base Total"
 ])
 
@@ -21,7 +21,7 @@ def load_data(path):
     return df
 
 with st.spinner("Chargement des données..."):
-    if dataset_choice == "CORDIS - Projets Siren en commun avec ANR":
+    if dataset_choice == "CORDIS - Organismes financé par EU/FR":
         filepath = r"Cordis_projets_communs_key.xlsx"
     else:
         filepath = r"cleanbasefinal_with_keywords.xlsx"
@@ -57,7 +57,8 @@ filters = {
     'year': st.sidebar.multiselect("Année de début", sorted(df['startyear'].dropna().astype(int).unique())),
     'role': st.sidebar.multiselect("Rôle", sorted(df['role'].dropna().unique())) if 'role' in df.columns else [],
     'legalbasis': st.sidebar.multiselect("Cadre légal", sorted(df['legalbasis'].dropna().unique())) if 'legalbasis' in df.columns else [],
-    'name': st.sidebar.multiselect("Organisation", sorted(df['name'].dropna().unique())) if 'name' in df.columns else []
+    'name': st.sidebar.multiselect("Organisation", sorted(df['name'].dropna().unique())) if 'name' in df.columns else [],
+    'city': st.sidebar.multiselect("Ville", sorted(df['city'].dropna().unique())) if 'city' in df.columns else []
 }
 
 for key, values in filters.items():
@@ -100,7 +101,7 @@ proj_title_most_common = df[df['id'] == most_common_id]['title'].iloc[0] if 'tit
 st.subheader("🔢 Indicateurs clés")
 c1, c2, c3 = st.columns(3)
 c1.metric("# Projets", num_projects)
-c2.metric("Financement EU (€)", f"{sum_ecfunding:,.0f}")
+c2.metric("Financement EC (€)", f"{sum_ecfunding:,.0f}")
 c3.metric("Total Cost (€)", f"{sum_totalcost:,.0f}")
 
 st.markdown(f"👥 Projet avec le plus de lignes (partenaires) : **{proj_title_most_common}** (ID {most_common_id}) — {nb_occurrences} lignes")
@@ -117,10 +118,16 @@ fig1 = px.bar(
     df_year,
     x='startyear',
     y='year_ec',
-    title="Financement UE par année",
+    title="Financement UE par année en €",
     color='year_ec',
     text=df_year['year_ec'].map('{:,.0f}'.format)
 )
+fig1.update_traces(textposition="outside")
+fig1.update_layout(
+    yaxis_tickformat=',',
+    coloraxis_colorbar=dict(title="€", tickformat=',')
+)
+
 st.plotly_chart(fig1, use_container_width=True)
 
 # 📝 Extraction des coordonnées si 'geolocation'
@@ -134,9 +141,20 @@ if org_col in df.columns and 'city' in df.columns:
     st.subheader("🏢 Top 10 organisations par contribution UE")
     df_org = df.groupby([org_col, 'city'], as_index=False).agg(ec_total=('ecmaxcontribution', 'sum'))
     df_org = df_org.sort_values(by='ec_total', ascending=False).head(10)
-    fig2 = px.bar(df_org, x='ec_total', y=org_col, orientation='h', title="Top Organisations UE (avec ville)", color='ec_total', hover_data=['city'])
-    st.plotly_chart(fig2, use_container_width=True)
-    st.dataframe(df_org)
+    fig2 = px.bar(
+    df_org,
+    x=df_org['ec_total'],
+    y=org_col,
+    orientation='h',
+    title="Top Organisations UE (en milliards €)",
+    color=df_org['ec_total'],
+    hover_data=['city'],
+    text=(df_org['ec_total'] / 1_000_000_000).map('{:,.2f} B'.format)
+)
+fig2.update_traces(textposition='outside')
+fig2.update_layout(xaxis_tickformat=',.2f', coloraxis_colorbar=dict(title='Mds €', tickformat=',.2f'))
+st.plotly_chart(fig2, use_container_width=True)
+
 
 # 📊 Statuts
 if 'status' in df.columns:
@@ -163,9 +181,19 @@ if 'lat' in df.columns and 'long' in df.columns:
     st.plotly_chart(fig_map, use_container_width=True)
 
 # 🏆 Top 10 localisations
-st.subheader("🏆 Top 10 des localisations avec le plus de projets")
-top_locations = df.groupby(['geolocation', 'city'], as_index=False).agg(nb_projets=('id', 'nunique')).sort_values(by='nb_projets', ascending=False).head(10)
+df['city_clean'] = df['city'].str.lower().str.strip()
+df['city_clean'] = df['city_clean'].str.replace(r"paris\s*\d*", "paris", regex=True)
+df['city_clean'] = df['city_clean'].str.title()
+
+st.subheader("🏆 Top 10 des villes avec le plus de projets (regroupées)")
+top_locations = (
+    df.groupby('city_clean', as_index=False)
+      .agg(nb_projets=('id', 'nunique'))
+      .sort_values(by='nb_projets', ascending=False)
+      .head(10)
+)
 st.dataframe(top_locations)
+
 
 # 📋 Table finale
 st.subheader("📋 Données projets filtrées (complètes)")
