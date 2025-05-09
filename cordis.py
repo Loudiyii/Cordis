@@ -96,7 +96,9 @@ proj_longest = df_proj.loc[df_proj['duration_days'].idxmax()]
 most_common_id = df['id'].value_counts().idxmax()
 nb_occurrences = df['id'].value_counts().max()
 proj_title_most_common = df[df['id'] == most_common_id]['title'].iloc[0] if 'title' in df.columns else "(titre non dispo)"
-
+missing_keywords_pct = None
+if 'keywords' in df.columns:
+    missing_keywords_pct = df['keywords'].isna().mean() * 100
 st.subheader("🔢 Indicateurs clés")
 c1, c2, c3, c4= st.columns(4)
 c1.metric("# Projets", num_projects)
