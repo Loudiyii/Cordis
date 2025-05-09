@@ -100,7 +100,7 @@ proj_title_most_common = df[df['id'] == most_common_id]['title'].iloc[0] if 'tit
 st.subheader("🔢 Indicateurs clés")
 c1, c2, c3 = st.columns(3)
 c1.metric("# Projets", num_projects)
-c2.metric("Financement EC (€)", f"{sum_ecfunding:,.0f}")
+c2.metric("Financement EU (€)", f"{sum_ecfunding:,.0f}")
 c3.metric("Total Cost (€)", f"{sum_totalcost:,.0f}")
 
 st.markdown(f"👥 Projet avec le plus de lignes (partenaires) : **{proj_title_most_common}** (ID {most_common_id}) — {nb_occurrences} lignes")
