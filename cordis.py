@@ -22,9 +22,9 @@ def load_data(path):
 
 with st.spinner("Chargement des données..."):
     if dataset_choice == "CORDIS - Projets Siren en commun avec ANR":
-        filepath = r"C:\Users\abder\Downloads\Stage\Cordis\created\Cordis_projets_communs_key.xlsx"
+        filepath = r"Cordis_projets_communs_key.xlsx"
     else:
-        filepath = r"C:\Users\abder\Downloads\Stage\created\cleanbasefinal_with_keywords.xlsx"
+        filepath = r"cleanbasefinal_with_keywords.xlsx"
 
     df = load_data(filepath)
 
