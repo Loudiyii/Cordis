@@ -105,7 +105,7 @@ c2.metric("Financement EC (€)", f"{sum_ecfunding:,.0f}")
 c3.metric("Total Cost (€)", f"{sum_totalcost:,.0f}")
 
 st.markdown(f"👥 Projet avec le plus de lignes (partenaires) : **{proj_title_most_common}** (ID {most_common_id}) — {nb_occurrences} lignes")
-st.markdown(f"- Moy. EC fund : **{avg_ecfunding:,.0f} €**, Médiane : **{med_ecfunding:,.0f} €**")
+st.markdown(f"- Moy. EU fund : **{avg_ecfunding:,.0f} €**, Médiane : **{med_ecfunding:,.0f} €**")
 st.markdown(f"- Moy. totalCost : **{avg_totalcost:,.0f} €**, Médiane : **{med_totalcost:,.0f} €**")
 if proj_max is not None:
     st.markdown(f"💰 Projet le + cher : **{proj_max['title']}** (ID {proj_max['id']}) — {proj_max['totalcost']:,.0f} €")
