@@ -9,7 +9,7 @@ st.caption("⚠️ Chargement en cours, merci de patienter 🙏")
 
 # 📂 Choix du fichier source
 dataset_choice = st.sidebar.radio("📁 Sélection du dataset :", [
-    "CORDIS - Organismes financé par EU/FR",
+    "CORDIS - Organismes financés par EU/FR",
     "CORDIS - Base Total"
 ])
 
@@ -21,7 +21,7 @@ def load_data(path):
     return df
 
 with st.spinner("Chargement des données..."):
-    if dataset_choice == "CORDIS - Organismes financé par EU/FR":
+    if dataset_choice == "CORDIS - Organismes financés par EU/FR":
         filepath = r"Cordis_projets_communs_key.xlsx"
     else:
         filepath = r"cleanbasefinal_with_keywords.xlsx"
