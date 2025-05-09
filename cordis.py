@@ -113,7 +113,14 @@ st.markdown(f"⏳ Projet le + long : **{proj_longest['title']}** (ID {proj_longe
 # 📈 Financement UE par année
 st.subheader("📈 Financement UE par année")
 df_year = df_proj.groupby('startyear', as_index=False).agg(year_ec=('ecmaxcontribution', 'sum'))
-fig1 = px.bar(df_year, x='startyear', y='year_ec', title="Financement UE par année", color='year_ec')
+fig1 = px.bar(
+    df_year,
+    x='startyear',
+    y='year_ec',
+    title="Financement UE par année",
+    color='year_ec',
+    text=df_year['year_ec'].map('{:,.0f}'.format)
+)
 st.plotly_chart(fig1, use_container_width=True)
 
 # 📝 Extraction des coordonnées si 'geolocation'
