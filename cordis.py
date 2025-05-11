@@ -142,7 +142,7 @@ if 'geolocation' in df.columns:
 # 🏢 Top organisations avec ville
 if org_col in df.columns and 'city' in df.columns:
     st.subheader("🏢 Top 10 organisations par contribution UE")
-    df_org = df_proj.groupby([org_col, 'city'], as_index=False).agg(ec_total=('ecmaxcontribution', 'sum'))
+    df_org = df.groupby([org_col, 'city'], as_index=False).agg(ec_total=('ecmaxcontribution', 'sum'))
     df_org = df_org.sort_values(by='ec_total', ascending=False).head(10)
     fig2 = px.bar(
     df_org,
