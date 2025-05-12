@@ -58,7 +58,8 @@ filters = {
     'role': st.sidebar.multiselect("Rôle", sorted(df['role'].dropna().unique())) if 'role' in df.columns else [],
     'legalbasis': st.sidebar.multiselect("Cadre légal", sorted(df['legalbasis'].dropna().unique())) if 'legalbasis' in df.columns else [],
     'name': st.sidebar.multiselect("Organisation", sorted(df['name'].dropna().unique())) if 'name' in df.columns else [],
-    'city': st.sidebar.multiselect("Ville", sorted(df['city'].dropna().unique())) if 'city' in df.columns else []
+    'city': st.sidebar.multiselect("Ville", sorted(df['city'].dropna().unique())) if 'city' in df.columns else [],
+    'acronym': st.sidebar.multiselect("Acronyme", sorted(df['acronym'].dropna().unique())) if 'acronym' in df.columns else []
 }
 
 for key, values in filters.items():
