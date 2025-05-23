@@ -22,9 +22,9 @@ def load_data(path):
 
 with st.spinner("Chargement des données..."):
     if dataset_choice == "CORDIS - Organismes financés par EU/FR":
-        filepath = r"Cordis_projets_communs_key.xlsx"
+        filepath = r"jointure_resultat.xlsx"
     else:
-        filepath = r"cleanbasefinal_with_keywords.xlsx"
+        filepath = r"cleanbasefinal_with_keywords_v2_virgule_separe.xlsx"
 
     df = load_data(filepath)
 
@@ -49,7 +49,9 @@ filters = {
     'legalbasis': st.sidebar.multiselect("Cadre légal", sorted(df['legalbasis'].dropna().unique())) if 'legalbasis' in df.columns else [],
     'name': st.sidebar.multiselect("Organisation", sorted(df['name'].dropna().unique())) if 'name' in df.columns else [],
     'city': st.sidebar.multiselect("Ville", sorted(df['city'].dropna().unique())) if 'city' in df.columns else [],
-    'acronym': st.sidebar.multiselect("Acronyme", sorted(df['acronym'].dropna().unique())) if 'acronym' in df.columns else []
+    'acronym': st.sidebar.multiselect("Acronyme", sorted(df['acronym'].dropna().unique())) if 'acronym' in df.columns else [],
+    "categorie_principale": st.sidebar.multiselect("Catégorie scientifique", sorted(df['categorie_principale'].dropna().unique())) if 'categorie_principale' in df.columns else [],
+    "sous_categorie": st.sidebar.multiselect("Sous-catégorie", sorted(df['sous_categorie'].dropna().unique())) if 'sous_categorie' in df.columns else []
 }
 
 df_filtered = df.copy()
@@ -84,13 +86,14 @@ if 1==1:
         col4.metric("% sans mots-clés", f"{pct_na:.1f}%")
 
     # Tabs avec visualisations
-    tab1, tab2, tab3, tab4, tab5 ,tab6= st.tabs([
+    tab1, tab2, tab3, tab4, tab5 ,tab6,tab7= st.tabs([
         "📈 Financement par année",
         "🏢 Top organisations",
         "📊 Statuts",
         "📊 Rôles",
         "🌍 Carte des projets",
-        "Données brutes"
+        "🔑 Statistiques Mots-clés & Catégories",
+        "📊 Données brutes"
     ])
 
     with tab1:
@@ -159,8 +162,84 @@ if 1==1:
                                         title="Carte des projets", hover_name='city')
             fig_map.update_layout(mapbox_style="open-street-map")
             st.plotly_chart(fig_map, use_container_width=True)
-    with tab6:
+
+with tab6:
+    st.subheader("🔑 Statistiques Mots-clés")
+    if "keywords" in df.columns:
+        # explode de la liste de keywords (séparateur « ; » ou « , » selon ton fichier)
+        kw_list = (
+            df["keywords"]
+            .dropna()
+            .str.split(r"[;,]")         # adapte le séparateur
+            .explode()
+            .str.strip()
+        )
+        total_kw    = kw_list.size
+        unique_kw   = kw_list.nunique()
+        na_kw_pct   = df["keywords"].isna().mean() * 100
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total mots-clés",     f"{total_kw}")
+        c2.metric("Mots-clés uniques",   f"{unique_kw}")
+        c3.metric("% Projets sans mots-clés", f"{na_kw_pct:.1f}%")
+
+        top10_kw = kw_list.value_counts().head(10)
+        fig_kw   = px.bar(
+            top10_kw, 
+            x=top10_kw.values, 
+            y=top10_kw.index, 
+            orientation="h",
+            labels={"x":"Occurrences","y":"Keyword"},
+            title="Top 10 des mots-clés"
+        )
+        fig_kw.update_layout(margin=dict(l=0,r=0,t=30,b=0))
+        st.plotly_chart(fig_kw, use_container_width=True)
+    else:
+        st.info("Aucune colonne `keywords` détectée.")
+
+    st.subheader("🔬 Statistiques Champs Scientifiques & Catégories")
+    if all(col in df.columns for col in ["champs_scientifique","categorie_principale","sous_categorie"]):
+        # metrics
+        total_cs    = df["champs_scientifique"].notna().sum()
+        unique_cs   = df["champs_scientifique"].nunique()
+        total_cat   = df["categorie_principale"].notna().sum()
+        unique_cat  = df["categorie_principale"].nunique()
+        total_sub   = df["sous_categorie"].notna().sum()
+        unique_sub  = df["sous_categorie"].nunique()
+
+        d1, d2, d3 = st.columns(3)
+        d1.metric("Lignes avec champ scientifique",    f"{total_cs}")
+        d2.metric("Catégories principales uniques",    f"{unique_cat}")
+        d3.metric("Sous-catégories uniques",           f"{unique_sub}")
+
+        # Top catégories
+        top_cat = df["categorie_principale"].value_counts().head(10)
+        fig_cat = px.bar(
+            top_cat,
+            x=top_cat.values,
+            y=top_cat.index,
+            orientation="h",
+            labels={"x":"Occurrences","y":"Catégorie Principale"},
+            title="Top 10 Catégories Principales"
+        )
+        fig_cat.update_layout(margin=dict(l=0,r=0,t=30,b=0))
+        st.plotly_chart(fig_cat, use_container_width=True)
+
+        # Top sous-catégories
+        top_sub = df["sous_categorie"].value_counts().head(10)
+        fig_sub = px.bar(
+            top_sub,
+            x=top_sub.values,
+            y=top_sub.index,
+            orientation="h",
+            labels={"x":"Occurrences","y":"Sous-catégorie"},
+            title="Top 10 Sous-Catégories"
+        )
+        fig_sub.update_layout(margin=dict(l=0,r=0,t=30,b=0))
+        st.plotly_chart(fig_sub, use_container_width=True)
+    else:
+        st.info("Colonnes `champs_scientifique`, `categorie_principale` ou `sous_categorie` manquantes.")
+    with tab7:
         st.subheader("📊 Données brutes")
         st.dataframe(df_filtered, use_container_width=True)
         
-
