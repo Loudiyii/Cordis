@@ -163,39 +163,39 @@ if 1==1:
             fig_map.update_layout(mapbox_style="open-street-map")
             st.plotly_chart(fig_map, use_container_width=True)
 
-with tab6:
-    st.subheader("🔑 Statistiques Mots-clés")
-    if "keywords" in df.columns:
-        # explode de la liste de keywords (séparateur « ; » ou « , » selon ton fichier)
-        kw_list = (
-            df["keywords"]
-            .dropna()
-            .str.split(r"[;,]")         # adapte le séparateur
-            .explode()
-            .str.strip()
-        )
-        total_kw    = kw_list.size
-        unique_kw   = kw_list.nunique()
-        na_kw_pct   = df["keywords"].isna().mean() * 100
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Total mots-clés",     f"{total_kw}")
-        c2.metric("Mots-clés uniques",   f"{unique_kw}")
-        c3.metric("% Projets sans mots-clés", f"{na_kw_pct:.1f}%")
-
-        top10_kw = kw_list.value_counts().head(10)
-        fig_kw   = px.bar(
-            top10_kw, 
-            x=top10_kw.values, 
-            y=top10_kw.index, 
-            orientation="h",
-            labels={"x":"Occurrences","y":"Keyword"},
-            title="Top 10 des mots-clés"
-        )
-        fig_kw.update_layout(margin=dict(l=0,r=0,t=30,b=0))
-        st.plotly_chart(fig_kw, use_container_width=True)
-    else:
-        st.info("Aucune colonne `keywords` détectée.")
+    with tab6:
+        st.subheader("🔑 Statistiques Mots-clés")
+        if "keywords" in df.columns:
+            # explode de la liste de keywords (séparateur « ; » ou « , » selon ton fichier)
+            kw_list = (
+                df["keywords"]
+                .dropna()
+                .str.split(r"[;,]")         # adapte le séparateur
+                .explode()
+                .str.strip()
+            )
+            total_kw    = kw_list.size
+            unique_kw   = kw_list.nunique()
+            na_kw_pct   = df["keywords"].isna().mean() * 100
+    
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total mots-clés",     f"{total_kw}")
+            c2.metric("Mots-clés uniques",   f"{unique_kw}")
+            c3.metric("% Projets sans mots-clés", f"{na_kw_pct:.1f}%")
+    
+            top10_kw = kw_list.value_counts().head(10)
+            fig_kw   = px.bar(
+                top10_kw, 
+                x=top10_kw.values, 
+                y=top10_kw.index, 
+                orientation="h",
+                labels={"x":"Occurrences","y":"Keyword"},
+                title="Top 10 des mots-clés"
+            )
+            fig_kw.update_layout(margin=dict(l=0,r=0,t=30,b=0))
+            st.plotly_chart(fig_kw, use_container_width=True)
+        else:
+            st.info("Aucune colonne `keywords` détectée.")
 
     st.subheader("🔬 Statistiques Champs Scientifiques & Catégories")
     if all(col in df.columns for col in ["champs_scientifique","categorie_principale","sous_categorie"]):
