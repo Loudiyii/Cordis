@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 
 # ⚙️ Configuration de la page
@@ -8,12 +9,15 @@ st.title("📊 Tableau de bord des projets financés par CORDIS")
 st.caption("⚠️ Chargement en cours, merci de patienter 🙏")
 
 # 📂 Choix du fichier source
-dataset_choice = st.sidebar.radio("📁 Sélection du dataset :", [
-    "CORDIS - Organismes financés par EU/FR",
-    "CORDIS - Base Total"
-])
+dataset_choice = st.sidebar.radio(
+    "📁 Choix du dataset :",
+    [
+        "CORDIS - Organismes financés par EU/FR",
+        "CORDIS - Base Total"
+    ],
+    index=0
+)
 
-# 🔄 Chargement dynamique en fonction du choix
 @st.cache_data
 def load_data(path):
     df = pd.read_excel(path)
@@ -21,225 +25,261 @@ def load_data(path):
     return df
 
 with st.spinner("Chargement des données..."):
-    if dataset_choice == "CORDIS - Organismes financés par EU/FR":
-        filepath = r"jointure_resultat.xlsx"
-    else:
-        filepath = r"cleanbasefinal_with_keywords_v2_virgule_separe.xlsx"
-
+    filepath = (
+        r"jointure_resultat.xlsx"
+        if dataset_choice == "CORDIS - Organismes financés par EU/FR"
+        else r"cleanbasefinal_with_keywords_v2_virgule_separe.xlsx"
+    )
     df = load_data(filepath)
 
 st.success(f"✅ Dataset chargé : {dataset_choice}")
 
-# ✅ Vérification colonnes nécessaires
 # Prétraitement
-df['startdate'] = pd.to_datetime(df['startdate'], errors='coerce')
-df['enddate'] = pd.to_datetime(df['enddate'], errors='coerce')
+for date_col in ['startdate', 'enddate']:
+    df[date_col] = pd.to_datetime(df.get(date_col), errors='coerce')
 df['startyear'] = df['startdate'].dt.year
-
 for col in ['totalcost_project', 'ecmaxcontribution', 'eccontribution', 'neteccontribution']:
     if col in df.columns:
-        df[col] = pd.to_numeric(df[col].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce')
+        df[col] = pd.to_numeric(
+            df[col].astype(str)
+                  .str.replace('.', '', regex=False)
+                  .str.replace(',', '.', regex=False),
+            errors='coerce'
+        )
 
-# Filtres dynamiques
+# 🧰 Filtres dynamiques
 st.sidebar.header("🎯 Filtres")
-filters = {
-    'status': st.sidebar.multiselect("Statut", sorted(df['status'].dropna().unique())) if 'status' in df.columns else [],
-    'year': st.sidebar.multiselect("Année", sorted(df['startyear'].dropna().unique())),
-    'role': st.sidebar.multiselect("Rôle", sorted(df['role'].dropna().unique())) if 'role' in df.columns else [],
-    'legalbasis': st.sidebar.multiselect("Cadre légal", sorted(df['legalbasis'].dropna().unique())) if 'legalbasis' in df.columns else [],
-    'name': st.sidebar.multiselect("Organisation", sorted(df['name'].dropna().unique())) if 'name' in df.columns else [],
-    'city': st.sidebar.multiselect("Ville", sorted(df['city'].dropna().unique())) if 'city' in df.columns else [],
-    'acronym': st.sidebar.multiselect("Acronyme", sorted(df['acronym'].dropna().unique())) if 'acronym' in df.columns else [],
-    "categorie_principale": st.sidebar.multiselect("Catégorie scientifique", sorted(df['categorie_principale'].dropna().unique())) if 'categorie_principale' in df.columns else [],
-    "sous_categorie": st.sidebar.multiselect("Sous-catégorie", sorted(df['sous_categorie'].dropna().unique())) if 'sous_categorie' in df.columns else []
-}
+filters = {}
+for col, label in [
+    ('status', 'Statut'),
+    ('year', 'Année'),
+    ('role', 'Rôle'),
+    ('legalbasis', 'Cadre légal'),
+    ('name', 'Organisation'),
+    ('city', 'Ville'),
+    ('acronym', 'Acronyme'),
+    ('categorie_principale', 'Catégorie scientifique'),
+    ('sous_categorie', 'Sous-catégorie')
+]:
+    if col == 'year':
+        opts = sorted(df['startyear'].dropna().unique())
+    elif col in df.columns:
+        opts = sorted(df[col].dropna().unique())
+    else:
+        continue
+    filters[col] = st.sidebar.multiselect(label, opts)
 
+# 🔍 Application des filtres
 df_filtered = df.copy()
-for key, values in filters.items():
-    if values:
-        col = 'startyear' if key == 'year' else key
-        df_filtered = df_filtered[df_filtered[col].isin(values)]
+for k, v in filters.items():
+    if v:
+        key = 'startyear' if k == 'year' else k
+        df_filtered = df_filtered[df_filtered[key].isin(v)]
 
-# Agrégation principale
-df_proj = df_filtered.groupby('id', as_index=False).agg(
-    title=('title', 'first'),
-    totalcost=('totalcost_project', 'first'),
-    ecmaxcontribution=('ecmaxcontribution', 'first'),
-    startdate=('startdate', 'min'),
-    enddate=('enddate', 'max')
+# 📊 Agrégation des projets
+df_proj = (
+    df_filtered
+    .groupby('id', as_index=False)
+    .agg(
+        title=('title', 'first'),
+        totalcost=('totalcost_project', 'first'),
+        ecmax=('ecmaxcontribution', 'first'),
+        startdate=('startdate', 'min'),
+        enddate=('enddate', 'max')
+    )
 )
-df_proj['duration_days'] = (df_proj['enddate'] - df_proj['startdate']).dt.days
 df_proj['startyear'] = df_proj['startdate'].dt.year
-
-# Page Tableau de bord global
-if 1==1:
+if 1 == 1:
     st.title("📊 Tableau de bord CORDIS 2014-2023")
 
     # KPIs
     st.subheader("🔢 Indicateurs clés")
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Nombre projets", df_proj['title'].nunique())
-    col2.metric("Financement UE (€)", f"{df_proj['ecmaxcontribution'].sum():,.0f}")
+    col2.metric("Financement UE (€)", f"{df_proj['ecmax'].sum():,.0f}")
     col3.metric("Coût total (€)", f"{df_proj['totalcost'].sum():,.0f}")
     if 'keywords' in df.columns:
         pct_na = df_filtered['keywords'].isna().mean() * 100
         col4.metric("% sans mots-clés", f"{pct_na:.1f}%")
 
-    # Tabs avec visualisations
-    tab1, tab2, tab3, tab4, tab5 ,tab6,tab7= st.tabs([
-        "📈 Financement par année",
-        "🏢 Top organisations",
-        "📊 Statuts",
-        "📊 Rôles",
-        "🌍 Carte des projets",
-        "🔑 Statistiques Mots-clés & Catégories",
-        "📊 Données brutes"
-    ])
+def compute_cagr(start, end, n):
+    return ((end/start)**(1/n)-1)*100 if start > 0 and n > 0 else np.nan
 
-    with tab1:
-        df_year = df_proj.groupby('startyear').agg(total_funding=('ecmaxcontribution', 'sum')).reset_index()
-        fig = px.bar(df_year, x='startyear', y='total_funding', text='total_funding', color='total_funding')
-        fig.update_traces(textposition='outside')
-        fig.update_layout(yaxis_tickformat=',')
-        st.plotly_chart(fig, use_container_width=True)
+# 🗂️ Création des onglets (NO résumé tab!)
+tabs = st.tabs([
+    "📈 Financement par année",
+    "📊 Évolution catégories",
+    "🏢 Top organisations",
+    "📊 Statuts",
+    "📊 Rôles",
+    "🌍 Carte des projets",
+    "🔑 Mots-clés & Catégories",
+    "📊 Données brutes"
+])
 
-        # 🔍 Insight automatique
-        peak_year = df_year.loc[df_year['total_funding'].idxmax()]
+# [0] Financement par année
+with tabs[0]:
+    df_year_cat = (
+        df_filtered
+        .groupby(['startyear', 'categorie_principale'], as_index=False)
+        .ecmaxcontribution.sum()
+        .rename(columns={'ecmaxcontribution': 'total_funding'})
+    )
+    years = sorted(df_year_cat['startyear'].unique())
+    y0 = st.selectbox("Année début", years, index=0, key="y0")
+    y1 = st.selectbox("Année fin", years, index=len(years)-1, key="y1")
+    df_bar = df_year_cat[df_year_cat['startyear'].between(y0, y1)].copy()
+    df_bar['pct'] = df_bar.groupby('startyear')['total_funding'].transform(lambda x: x / x.sum() * 100)
+    fig1 = px.bar(df_bar, x='startyear', y='total_funding', color='categorie_principale',
+                  text=df_bar['pct'].round(1).astype(str)+'%', barmode='stack', template='plotly_white',
+                  labels={'startyear': 'Année', 'total_funding': 'Financement (€)', 'categorie_principale': 'Catégorie'})
+    fig1.update_layout(legend=dict(orientation='h', y=1.02, x=1), bargap=0.2)
+    st.plotly_chart(fig1, use_container_width=True)
+    # Insight
+    if not df_bar.empty:
+        ly = df_bar['startyear'].max()
+        top = df_bar[df_bar['startyear'] == ly].nlargest(1, 'total_funding').iloc[0]
         st.markdown(
-            f"🔍 **Insight :** L'année avec le plus de financement est **{int(peak_year['startyear'])}**, "
-            f"avec **{peak_year['total_funding']:,.0f} €** alloués."
-        )
-        st.title("📅 Top 10 projets les plus financés par année")
-        available_years = sorted(df_filtered['startyear'].dropna().unique())
-        selected_year = st.selectbox("🗓️ Choisir une année", available_years)
-        df_year = df_filtered[df_filtered['startyear'] == selected_year]
-        df_top10 = df_year.groupby(['id', 'title'], as_index=False).agg(financement=('ecmaxcontribution', 'sum')).sort_values(by='financement', ascending=False).head(10)
-        st.dataframe(df_top10)
+    f"ℹ️ **Insight** : De **{y0} à {y1}**, la catégorie la plus financée est **{top['categorie_principale']}** avec **{top['total_funding']:,.0f} €**."
+    "<br/><span style='font-size: 0.95em; color: #888;'>"
+    "Utilisez les filtres “Année début” et “Année fin” ci-dessus pour modifier la période analysée."
+    "</span>",
+    unsafe_allow_html=True
+)
 
-    with tab2:
-        if 'name' in df_filtered.columns and 'city' in df_filtered.columns:
-            df_org = df_filtered.groupby(['name', 'city']).agg(ec_total=('ecmaxcontribution', 'sum')).reset_index()
-            df_top = df_org.sort_values(by='ec_total', ascending=False).head(10)
-            fig2 = px.bar(df_top, x='ec_total', y='name', orientation='h', text='ec_total', color='ec_total', hover_data=['city'])
-            fig2.update_traces(textposition='outside')
-            fig2.update_layout(xaxis_tickformat=',')
-            st.plotly_chart(fig2, use_container_width=True)
+# [1] Évolution catégories
+with tabs[1]:
+    st.subheader("📈 Évolution des catégories principales")
 
-    with tab3:
-        if 'status' in df_filtered.columns:
-            status_counts = df_filtered.drop_duplicates('id')['status'].value_counts().reset_index()
-            status_counts.columns = ['status', 'count']
-            fig3 = px.pie(status_counts, names='status', values='count', title="Statut des projets")
-            st.plotly_chart(fig3, use_container_width=True)
+    df_year_cat = (
+        df_filtered
+        .groupby(['startyear', 'categorie_principale'], as_index=False)
+        .ecmaxcontribution.sum()
+        .rename(columns={'ecmaxcontribution': 'total_funding'})
+    )
+    years = sorted(df_year_cat['startyear'].unique())
+    l0 = st.selectbox("Année début", years, index=0, key="l0")
+    l1 = st.selectbox("Année fin", years, index=len(years)-1, key="l1")
 
-        # 🧠 Insight automatique
-        dominant_status = status_counts.iloc[0]['status']
-        dominant_pct = round(status_counts.iloc[0]['count'] / status_counts['count'].sum() * 100, 1)
-        st.markdown(f"🔍 **Insight :** La majorité des projets sont **{dominant_status.lower()}** ({dominant_pct}%).")
+    df_line_sel = df_year_cat[df_year_cat['startyear'].between(l0, l1)]
 
-    with tab4:
-        if 'role' in df_filtered.columns:
-            role_counts = df_filtered.drop_duplicates(['id', 'role'])['role'].value_counts().reset_index()
-            role_counts.columns = ['role', 'count']
-            fig4 = px.pie(role_counts, names='role', values='count', title="Rôle des entités")
-            st.plotly_chart(fig4, use_container_width=True)
+    # Sélecteur de catégorie principale pour filtrer les sous-catégories
+    all_categories = sorted(df_line_sel['categorie_principale'].dropna().unique())
+    selected_cats = st.multiselect("Filtrer par catégorie principale :", all_categories, default=all_categories)
 
-            # 🧠 Insight automatique
-            dominant_role = role_counts.iloc[0]['role']
-            dominant_pct = round(role_counts.iloc[0]['count'] / role_counts['count'].sum() * 100, 1)
-            st.markdown(f"🔍 **Insight :** Le rôle le plus fréquent est **{dominant_role.lower()}** ({dominant_pct}%).")
+    # Filtrage du graphique 1
+    df_line_sel = df_line_sel[df_line_sel['categorie_principale'].isin(selected_cats)]
 
+    fig2 = px.line(df_line_sel, x='startyear', y='total_funding', color='categorie_principale',
+                   markers=True, template='plotly_white',
+                   labels={'startyear': 'Année', 'total_funding': 'Financement (€)', 'categorie_principale': 'Catégorie'})
+    fig2.update_layout(legend=dict(orientation='h', y=1.02, x=1))
+    st.plotly_chart(fig2, use_container_width=True)
 
-    with tab5:
-        if 'geolocation' in df_filtered.columns:
-            df_filtered[['lat', 'long']] = df_filtered['geolocation'].str.split(',', expand=True)
-            df_filtered['lat'] = pd.to_numeric(df_filtered['lat'], errors='coerce')
-            df_filtered['long'] = pd.to_numeric(df_filtered['long'], errors='coerce')
-        if 'lat' in df_filtered.columns and 'long' in df_filtered.columns:
-            df_map = df_filtered.groupby(['lat', 'long', 'city']).agg(nb_projets=('id', 'nunique')).reset_index().dropna()
-            fig_map = px.scatter_mapbox(df_map, lat='lat', lon='long', size='nb_projets', color='nb_projets',
-                                        color_continuous_scale='Viridis', zoom=4, height=600,
-                                        title="Carte des projets", hover_name='city')
-            fig_map.update_layout(mapbox_style="open-street-map")
-            st.plotly_chart(fig_map, use_container_width=True)
+    # Insight croissance principales
+    pivot = df_line_sel.pivot(index='categorie_principale', columns='startyear', values='total_funding').fillna(0)
+    pivot['growth'] = pivot.get(l1, 0) - pivot.get(l0, 0)
+    top3 = pivot['growth'].nlargest(3)
+    st.markdown(f"🔍 **Top 3 croissances ({l0}→{l1})** : " + ", ".join([f"{cat} (+{val:,.0f} €)" for cat, val in top3.items()]))
 
-    with tab6:
-        st.subheader("🔑 Statistiques Mots-clés")
-        if "keywords" in df.columns:
-            # explode de la liste de keywords (séparateur « ; » ou « , » selon ton fichier)
-            kw_list = (
-                df["keywords"]
-                .dropna()
-                .str.split(r"[;,]")         # adapte le séparateur
-                .explode()
-                .str.strip()
-            )
-            total_kw    = kw_list.size
-            unique_kw   = kw_list.nunique()
-            na_kw_pct   = df["keywords"].isna().mean() * 100
-    
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Total mots-clés",     f"{total_kw}")
-            c2.metric("Mots-clés uniques",   f"{unique_kw}")
-            c3.metric("% Projets sans mots-clés", f"{na_kw_pct:.1f}%")
-    
-            top10_kw = kw_list.value_counts().head(10)
-            fig_kw   = px.bar(
-                top10_kw, 
-                x=top10_kw.values, 
-                y=top10_kw.index, 
-                orientation="h",
-                labels={"x":"Occurrences","y":"Keyword"},
-                title="Top 10 des mots-clés"
-            )
-            fig_kw.update_layout(margin=dict(l=0,r=0,t=30,b=0))
-            st.plotly_chart(fig_kw, use_container_width=True)
-        else:
-            st.info("Aucune colonne `keywords` détectée.")
+    # Évolution sous-catégories
+    st.subheader("📉 Évolution des sous-catégories")
 
-    st.subheader("🔬 Statistiques Champs Scientifiques & Catégories")
-    if all(col in df.columns for col in ["champs_scientifique","categorie_principale","sous_categorie"]):
-        # metrics
-        total_cs    = df["champs_scientifique"].notna().sum()
-        unique_cs   = df["champs_scientifique"].nunique()
-        total_cat   = df["categorie_principale"].notna().sum()
-        unique_cat  = df["categorie_principale"].nunique()
-        total_sub   = df["sous_categorie"].notna().sum()
-        unique_sub  = df["sous_categorie"].nunique()
+    df_souscat = (
+        df_filtered
+        .groupby(['startyear', 'categorie_principale', 'sous_categorie'], as_index=False)
+        .agg(total_funding=('ecmaxcontribution', 'sum'))
+        .dropna(subset=['sous_categorie'])
+    )
+    df_souscat_sel = df_souscat[
+        (df_souscat['startyear'].between(l0, l1)) &
+        (df_souscat['categorie_principale'].isin(selected_cats))
+    ]
 
-        d1, d2, d3 = st.columns(3)
-        d1.metric("Lignes avec champ scientifique",    f"{total_cs}")
-        d2.metric("Catégories principales uniques",    f"{unique_cat}")
-        d3.metric("Sous-catégories uniques",           f"{unique_sub}")
+    fig2b = px.line(
+        df_souscat_sel,
+        x='startyear',
+        y='total_funding',
+        color='sous_categorie',
+        markers=True,
+        template='plotly_white',
+        labels={
+            'startyear': 'Année',
+            'total_funding': 'Financement (€)',
+            'sous_categorie': 'Sous-catégorie'
+        }
+    )
+    fig2b.update_layout(legend=dict(orientation='h', y=1.1, x=0))
+    st.plotly_chart(fig2b, use_container_width=True)
 
-        # Top catégories
-        top_cat = df["categorie_principale"].value_counts().head(10)
-        fig_cat = px.bar(
-            top_cat,
-            x=top_cat.values,
-            y=top_cat.index,
-            orientation="h",
-            labels={"x":"Occurrences","y":"Catégorie Principale"},
-            title="Top 10 Catégories Principales"
-        )
-        fig_cat.update_layout(margin=dict(l=0,r=0,t=30,b=0))
-        st.plotly_chart(fig_cat, use_container_width=True)
+    # Insight croissance sous-catégories
+    pivot_souscat = df_souscat_sel.pivot(index='sous_categorie', columns='startyear', values='total_funding').fillna(0)
+    pivot_souscat['growth'] = pivot_souscat.get(l1, 0) - pivot_souscat.get(l0, 0)
+    top3_souscat = pivot_souscat['growth'].nlargest(3)
 
-        # Top sous-catégories
-        top_sub = df["sous_categorie"].value_counts().head(10)
-        fig_sub = px.bar(
-            top_sub,
-            x=top_sub.values,
-            y=top_sub.index,
-            orientation="h",
-            labels={"x":"Occurrences","y":"Sous-catégorie"},
-            title="Top 10 Sous-Catégories"
-        )
-        fig_sub.update_layout(margin=dict(l=0,r=0,t=30,b=0))
-        st.plotly_chart(fig_sub, use_container_width=True)
-    else:
-        st.info("Colonnes `champs_scientifique`, `categorie_principale` ou `sous_categorie` manquantes.")
-    with tab7:
-        st.subheader("📊 Données brutes")
-        st.dataframe(df_filtered, use_container_width=True)
-        
+    st.markdown("🔍 **Top 3 croissances sous-catégories** : " + ", ".join([f"{cat} (+{val:,.0f} €)" for cat, val in top3_souscat.items()]))
+
+# [2] Top organisations
+with tabs[2]:
+    df_org = df_filtered.groupby(['name', 'city'], as_index=False).ecmaxcontribution.sum().rename(columns={'ecmaxcontribution': 'total'})
+    fig3 = px.bar(df_org.nlargest(10, 'total'), x='total', y='name', orientation='h', text='total',
+                  color='total', hover_data=['city'], template='plotly_white',
+                  labels={'total': 'Financement (€)', 'name': 'Organisation'})
+    fig3.update_layout(yaxis={'categoryorder': 'total ascending'})
+    st.plotly_chart(fig3, use_container_width=True)
+    if not df_org.empty:
+        top_org = df_org.nlargest(1, 'total').iloc[0]
+        st.markdown(f"ℹ️ **Insight** : L'organisation la mieux financée est **{top_org['name']}** ({top_org['total']:,.0f} €) basée à {top_org['city']}.")
+
+# [3] Statuts
+with tabs[3]:
+    if 'status' in df_filtered.columns:
+        df_stat = df_filtered.drop_duplicates('id')['status'].value_counts().reset_index(name='count').rename(columns={'index': 'status'})
+        fig4 = px.pie(df_stat, names='status', values='count', title='Répartition des statuts', template='plotly_white')
+        st.plotly_chart(fig4, use_container_width=True)
+        # Insight
+        top_status = df_stat.nlargest(1, 'count').iloc[0]
+        st.markdown(f"ℹ️ **Insight** : Le statut le plus fréquent est **{top_status['status']}** avec {top_status['count']} projets.")
+
+# [4] Rôles
+with tabs[4]:
+    if 'role' in df_filtered.columns:
+        df_role = df_filtered.drop_duplicates(['id', 'role'])['role'].value_counts().reset_index(name='count').rename(columns={'index': 'role'})
+        fig5 = px.pie(df_role, names='role', values='count', title='Répartition des rôles', template='plotly_white')
+        st.plotly_chart(fig5, use_container_width=True)
+        top_role = df_role.nlargest(1, 'count').iloc[0]
+        st.markdown(f"ℹ️ **Insight** : Le rôle prédominant est **{top_role['role']}** dans {top_role['count']} projets.")
+
+# [5] Carte des projets
+with tabs[5]:
+    if 'geolocation' in df_filtered.columns:
+        coords = df_filtered['geolocation'].str.split(',', expand=True)
+        df_filtered['lat'] = pd.to_numeric(coords[0], errors='coerce')
+        df_filtered['lon'] = pd.to_numeric(coords[1], errors='coerce')
+        df_map = df_filtered.dropna(subset=['lat', 'lon']).groupby('city', as_index=False).agg(nb=('id', 'nunique'), lat=('lat', 'first'), lon=('lon', 'first'))
+        fig6 = px.scatter_mapbox(df_map, lat='lat', lon='lon', size='nb', color='nb',
+                                 hover_name='city', zoom=4, height=500, template='plotly_white')
+        fig6.update_layout(mapbox_style='open-street-map')
+        st.plotly_chart(fig6, use_container_width=True)
+        top_city = df_map.nlargest(1, 'nb').iloc[0]
+        st.markdown(f"ℹ️ **Insight** : La ville avec le plus de projets est **{top_city['city']}** ({top_city['nb']} projets).")
+
+# [6] Mots-clés & Catégories
+with tabs[6]:
+    st.subheader('🔑 Mots-clés')
+    if 'keywords' in df_filtered.columns:
+        kws = df_filtered['keywords'].dropna().str.split(r'[;,]').explode().str.strip()
+        top10 = kws.value_counts().head(10).rename_axis('kw').reset_index(name='count')
+        fig7 = px.bar(top10, x='count', y='kw', orientation='h', template='plotly_white', labels={'count': 'Occurrences', 'kw': 'Mot-clé'})
+        st.plotly_chart(fig7, use_container_width=True)
+        st.markdown(f"ℹ️ **Insight** : Le mot-clé le plus fréquent est **{top10.iloc[0]['kw']}** ({top10.iloc[0]['count']} occurrences).")
+    st.subheader('🔬 Catégories scientifiques')
+    df_cat = df_filtered['categorie_principale'].value_counts().head(10).rename_axis('cat').reset_index(name='count')
+    st.bar_chart(df_cat.set_index('cat')['count'])
+
+# [7] Données brutes
+with tabs[7]:
+    st.subheader('📊 Données brutes')
+    st.write(df_filtered.select_dtypes(include=[np.number]).describe().T)
+    st.write("**Filtres actifs :**", {k: v for k, v in filters.items() if v})
+    st.download_button("Télécharger CSV", data=df_filtered.to_csv(index=False).encode('utf-8'), file_name="cordis_filtered.csv", mime="text/csv")
