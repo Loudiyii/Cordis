@@ -163,44 +163,90 @@ with tabs[0]:
 
 # [1] Répartition par année (nombre de projets)
 with tabs[1]:
-    st.subheader("📊 Répartition des projets par année")
+    st.subheader("📈 Évolution du nombre de projets par catégorie")
 
-    # On part de df_proj (chaque 'id' de projet est unique) pour compter par année de début
-    df_count_year = (
-        df_proj
-        .groupby('startyear', as_index=False)
+    # On part de df_filtered, on supprime les doublons (un projet = une ligne)
+    # et on récupère sa catégorie associée. Si un même id a plusieurs catégories,
+    # on conserve chaque paire (id, categorie_principale) pour compter correctement.
+    df_proj_cat = (
+        df_filtered
+        .drop_duplicates(subset=['id', 'categorie_principale'])
+        .copy()
+    )
+
+    # Comptabiliser le nombre de projets par startyear & categorie_principale
+    df_cat_year = (
+        df_proj_cat
+        .dropna(subset=['categorie_principale'])  # on enlève les lignes où categorie_principale est NaN
+        .groupby(['startyear', 'categorie_principale'], as_index=False)
         .agg(nb_projets=('id', 'nunique'))
+        .sort_values(['categorie_principale', 'startyear'])
+    )
+
+    # Graphique en courbes du nombre de projets par catégorie et par année
+    fig_cat = px.line(
+        df_cat_year,
+        x='startyear',
+        y='nb_projets',
+        color='categorie_principale',
+        markers=True,
+        template='plotly_white',
+        labels={
+            'startyear': 'Année de début',
+            'nb_projets': 'Nombre de projets',
+            'categorie_principale': 'Catégorie'
+        },
+        title="Évolution du nombre de projets par catégorie"
+    )
+    fig_cat.update_layout(legend=dict(orientation='h', y=1.02, x=0.1))
+    st.plotly_chart(fig_cat, use_container_width=True)
+
+    # Calcul du nombre de projets SANS catégorie (categorie_principale = NaN)
+    st.subheader("📉 Projets sans catégorie par année")
+    df_missing_cat = (
+        df_filtered[df_filtered['categorie_principale'].isna()]
+        .drop_duplicates(subset=['id'])
+        .groupby('startyear', as_index=False)
+        .agg(nb_sans_cat=('id', 'nunique'))
         .dropna(subset=['startyear'])
         .sort_values('startyear')
     )
 
-    # Graphique en barres du nombre de projets par année
-    fig_year = px.bar(
-        df_count_year,
+    # Si aucune ligne ne rentre dans cette condition, créer un DataFrame vide pour l'affichage
+    if df_missing_cat.empty:
+        df_missing_cat = pd.DataFrame({
+            'startyear': [],
+            'nb_sans_cat': []
+        })
+
+    fig_missing = px.bar(
+        df_missing_cat,
         x='startyear',
-        y='nb_projets',
-        text='nb_projets',
+        y='nb_sans_cat',
+        text='nb_sans_cat',
         template='plotly_white',
-        labels={'startyear': 'Année de début', 'nb_projets': 'Nombre de projets'},
-        title="Nombre de projets financés par année"
+        labels={
+            'startyear': 'Année de début',
+            'nb_sans_cat': 'Nombre de projets sans catégorie'
+        },
+        title="Nombre de projets sans catégorie (NaN) par année"
     )
-    fig_year.update_traces(textposition="outside")
-    fig_year.update_layout(
+    fig_missing.update_traces(textposition="outside")
+    fig_missing.update_layout(
         xaxis=dict(dtick=1),
-        yaxis=dict(title="Nombre de projets"),
+        yaxis=dict(title="Nombre de projets sans catégorie"),
         bargap=0.2
     )
-    st.plotly_chart(fig_year, use_container_width=True)
+    st.plotly_chart(fig_missing, use_container_width=True)
 
-    # Insight : année ayant le plus de projets
-    if not df_count_year.empty:
-        annee_max = int(df_count_year.loc[df_count_year['nb_projets'].idxmax(), 'startyear'])
-        nb_max = int(df_count_year['nb_projets'].max())
+    # Insight général : année avec le plus de projets sans catégorie
+    if not df_missing_cat.empty:
+        annee_max_missing = int(df_missing_cat.loc[df_missing_cat['nb_sans_cat'].idxmax(), 'startyear'])
+        nb_max_missing = int(df_missing_cat['nb_sans_cat'].max())
         st.markdown(
-            f"ℹ️ **Insight** : L'année avec le plus grand nombre de projets est "
-            f"**{annee_max}** avec **{nb_max}** projets."
+            f"ℹ️ **Insight** : L'année avec le plus grand nombre de projets sans catégorie est "
+            f"**{annee_max_missing}** avec **{nb_max_missing}** projets."
         )
-
 # [2] Évolution catégories
 with tabs[2]:
     st.subheader("📈 Évolution des catégories principales")
