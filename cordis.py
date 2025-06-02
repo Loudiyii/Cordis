@@ -118,27 +118,51 @@ tabs = st.tabs([
 ])
 
 # [0] Financement par année
-# [1] Répartition par année (nombre de projets)
-with tabs[1]:
-    st.subheader("📊 Répartition des projets par année")
-
-    # Comptabiliser le nombre de projets distincts par année de début
-    df_year_count = (
+with tabs[0]:
+    df_year_cat = (
         df_filtered
-        .drop_duplicates(subset=['id', 'startyear'])
+        .groupby(['startyear', 'categorie_principale'], as_index=False)
+        .ecmaxcontribution.sum()
+        .rename(columns={'ecmaxcontribution': 'total_funding'})
+    )
+    years = sorted(df_year_cat['startyear'].unique())
+    y0 = st.selectbox("Année début", years, index=0, key="y0")
+    y1 = st.selectbox("Année fin", years, index=len(years)-1, key="y1")
+    df_bar = df_year_cat[df_year_cat['startyear'].between(y0, y1)].copy()
+    df_bar['pct'] = df_bar.groupby('startyear')['total_funding'].transform(lambda x: x / x.sum() * 100)
+    fig1 = px.bar(df_bar, x='startyear', y='total_funding', color='categorie_principale',
+                  text=df_bar['pct'].round(1).astype(str)+'%', barmode='stack', template='plotly_white',
+                  labels={'startyear': 'Année', 'total_funding': 'Financement (€)', 'categorie_principale': 'Catégorie'})
+    fig1.update_layout(legend=dict(orientation='h', y=1.02, x=1), bargap=0.2)
+    st.plotly_chart(fig1, use_container_width=True)
+    # Insight
+    if not df_bar.empty:
+        ly = df_bar['startyear'].max()
+        top = df_bar[df_bar['startyear'] == ly].nlargest(1, 'total_funding').iloc[0]
+        st.markdown(
+    f"ℹ️ **Insight** : De **{y0} à {y1}**, la catégorie la plus financée est **{top['categorie_principale']}** avec **{top['total_funding']:,.0f} €**."
+    "<br/><span style='font-size: 0.95em; color: #888;'>"
+    "Utilisez les filtres “Année début” et “Année fin” ci-dessus pour modifier la période analysée."
+    "</span>",
+    unsafe_allow_html=True
+)
+
+# [1] Évolution catégories
+with tabs[1]:
+      st.subheader("📊 Répartition des projets par année")
+
+    # On part de df_proj (chaque 'id' de projet est unique) pour compter par année de début
+    df_count_year = (
+        df_proj
         .groupby('startyear', as_index=False)
         .agg(nb_projets=('id', 'nunique'))
+        .dropna(subset=['startyear'])
+        .sort_values('startyear')
     )
 
-    # S’assurer qu’il n’y a pas de valeurs manquantes pour startyear
-    df_year_count = df_year_count.dropna(subset=['startyear'])
-
-    # Trier par année croissante
-    df_year_count = df_year_count.sort_values('startyear')
-
-    # Affichage du graphique en barres
+    # Graphique en barres du nombre de projets par année
     fig_year = px.bar(
-        df_year_count,
+        df_count_year,
         x='startyear',
         y='nb_projets',
         text='nb_projets',
@@ -154,18 +178,14 @@ with tabs[1]:
     )
     st.plotly_chart(fig_year, use_container_width=True)
 
-    # Insight sur l’année la plus chargée
-    if not df_year_count.empty:
-        annee_max = df_year_count.loc[df_year_count['nb_projets'].idxmax(), 'startyear']
-        nb_max = int(df_year_count['nb_projets'].max())
+    # Insight : année ayant le plus de projets
+    if not df_count_year.empty:
+        annee_max = int(df_count_year.loc[df_count_year['nb_projets'].idxmax(), 'startyear'])
+        nb_max = int(df_count_year['nb_projets'].max())
         st.markdown(
             f"ℹ️ **Insight** : L'année avec le plus grand nombre de projets est "
-            f"**{int(annee_max)}** avec **{nb_max}** projets."
+            f"**{annee_max}** avec **{nb_max}** projets."
         )
-
-
-# [1] Évolution catégories
-with tabs[1]:
     st.subheader("📈 Évolution des catégories principales")
 
     df_year_cat = (
