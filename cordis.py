@@ -469,7 +469,7 @@ with tabs[7]:
 # [8] Données brutes
 with tabs[8]:
     st.subheader('📊 Données brutes')
-    st.write(df_filtered.select_dtypes(include=[np.number]).describe().T)
+    st.write(df_filtered.select_dtypes(include=[np.number]))
     st.write("**Filtres actifs :**", {k: v for k, v in filters.items() if v})
     st.download_button(
         "Télécharger CSV",
