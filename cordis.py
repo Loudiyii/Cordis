@@ -12,8 +12,9 @@ st.caption("⚠️ Chargement en cours, merci de patienter 🙏")
 dataset_choice = st.sidebar.radio(
     "📁 Choix du dataset :",
     [
-        "CORDIS - Organismes financés par EU/FR",
-        "CORDIS - Base Total"
+        "CORDIS - Base Total (FR)",
+        "CORDIS - Organismes financés par EU/FR"
+        
     ],
     index=0
 )
