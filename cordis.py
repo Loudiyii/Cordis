@@ -103,6 +103,84 @@ if 'keywords' in df.columns:
     pct_na = df_filtered['keywords'].isna().mean() * 100
     col4.metric("% sans mots-clés", f"{pct_na:.1f}%")
 
+# 📊 Analyse par nombre de partenaires
+st.subheader("📊 Répartition des projets par nombre de partenaires")
+
+# Calcul du nombre de partenaires par projet
+projets_groupes_base = df_filtered.groupby("id").agg(
+    nb_partenaire=("id", "count"),  # Compte le nombre de lignes (partenaires) par projet
+    financement_unique=("ecmaxcontribution", "first"),  # Prend le premier financement (ils sont identiques pour un même projet)
+    title=("title", "first"),
+    startyear=("startyear", "first")
+).reset_index()
+
+# Slider pour filtrer par nombre minimal de partenaires
+max_partners = int(projets_groupes_base["nb_partenaire"].max()) if not projets_groupes_base.empty else 10
+X = st.slider("Sélectionner un seuil minimal de partenaires :", min_value=1, max_value=max_partners, value=1)
+
+# Filtrage des projets selon le seuil
+codes_eligibles = projets_groupes_base[projets_groupes_base["nb_partenaire"] >= X]["id"]
+filtered_df_partners = df_filtered[df_filtered["id"].isin(codes_eligibles)]
+projets_groupes = projets_groupes_base[projets_groupes_base["id"].isin(codes_eligibles)]
+
+if projets_groupes.empty:
+    st.warning("⚠️ Aucun projet ne correspond aux filtres sélectionnés.")
+else:
+    # 🔢 KPIs sur les partenaires
+    nb_projets = projets_groupes.shape[0]
+    total_projets = projets_groupes_base.shape[0]
+    nb_projets_pourcent = (nb_projets / total_projets) * 100 if total_projets else 0
+    moyenne_partenaire = projets_groupes["nb_partenaire"].mean()
+
+    # Projets remarquables
+    if not projets_groupes.empty:
+        projet_max_idx = projets_groupes["nb_partenaire"].idxmax()
+        projet_max = projets_groupes.loc[projet_max_idx, "id"]
+        projet_max_title = projets_groupes.loc[projet_max_idx, "title"]
+        nb_max = projets_groupes["nb_partenaire"].max()
+        
+        max_funding_idx = projets_groupes["financement_unique"].idxmax()
+        max_funding = projets_groupes.loc[max_funding_idx, "id"]
+        max_funding_title = projets_groupes.loc[max_funding_idx, "title"]
+        max_funding_amount = projets_groupes["financement_unique"].max()
+        
+        min_funding_idx = projets_groupes["financement_unique"].idxmin()
+        min_funding = projets_groupes.loc[min_funding_idx, "id"]
+        min_funding_title = projets_groupes.loc[min_funding_idx, "title"]
+        min_funding_amount = projets_groupes["financement_unique"].min()
+
+    st.markdown(f"📊 **{nb_projets_pourcent:.2f}%** des projets ont **au moins {X} partenaires**.")
+    
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Projets sélectionnés", nb_projets)
+    k2.metric("Financement total (€)", f"{projets_groupes['financement_unique'].sum():,.0f}")
+    k3.metric("Organisations uniques", filtered_df_partners["name"].nunique())
+    k4.metric("Moy. partenaires/projet", f"{moyenne_partenaire:.2f}")
+
+    if not projets_groupes.empty:
+        st.markdown(f"🔍 **Projet avec le plus de partenaires :** `{projet_max}` avec **{nb_max}** partenaires")
+        st.markdown(f"📝 *{projet_max_title[:100]}...*" if len(projet_max_title) > 100 else f"📝 *{projet_max_title}*")
+        
+        st.markdown(f"💰 **Projet le plus financé :** `{max_funding}` → **{max_funding_amount:,.0f} €**")
+        st.markdown(f"📝 *{max_funding_title[:100]}...*" if len(max_funding_title) > 100 else f"📝 *{max_funding_title}*")
+        
+        st.markdown(f"💸 **Projet le moins financé :** `{min_funding}` → **{min_funding_amount:,.0f} €**")
+        st.markdown(f"📝 *{min_funding_title[:100]}...*" if len(min_funding_title) > 100 else f"📝 *{min_funding_title}*")
+
+    # Graphique de distribution des partenaires
+    st.subheader("📈 Distribution du nombre de partenaires")
+    partner_dist = projets_groupes["nb_partenaire"].value_counts().sort_index().reset_index()
+    partner_dist.columns = ["Nombre de partenaires", "Nombre de projets"]
+    
+    fig_dist = px.bar(
+        partner_dist, 
+        x="Nombre de partenaires", 
+        y="Nombre de projets",
+        title="Distribution du nombre de partenaires par projet",
+        template='plotly_white'
+    )
+    st.plotly_chart(fig_dist, use_container_width=True)
+
 def compute_cagr(start, end, n):
     return ((end/start)**(1/n)-1)*100 if start > 0 and n > 0 else np.nan
 
@@ -157,7 +235,7 @@ with tabs[0]:
             f"ℹ️ **Insight** : De **{y0} à {y1}**, la catégorie la plus financée "
             f"est **{top['categorie_principale']}** avec **{top['total_funding']:,.0f} €**."
             "<br/><span style='font-size: 0.95em; color: #888;'>"
-            "Utilisez les filtres “Année début” et “Année fin” ci-dessus pour modifier la période analysée."
+            "Utilisez les filtres "Année début" et "Année fin" ci-dessus pour modifier la période analysée."
             "</span>",
             unsafe_allow_html=True
         )
