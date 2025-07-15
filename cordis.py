@@ -233,10 +233,10 @@ with tabs[0]:
         top = df_bar[df_bar['startyear'] == ly].nlargest(1, 'total_funding').iloc[0]
         st.markdown(
             f"ℹ️ **Insight** : De **{y0} à {y1}**, la catégorie la plus financée "
-            f"est **{top['categorie_principale']}** avec **{top['total_funding']:,.0f} €**."
-            "<br/><span style='font-size: 0.95em; color: #888;'>"
-            "Utilisez les filtres "Année début" et "Année fin" ci-dessus pour modifier la période analysée."
-            "</span>",
+            f"est **{top['categorie_principale']}** avec **{top['total_funding']:,.0f} €**. "
+            f"<br/><span style='font-size: 0.95em; color: #888;'>"
+            f"Utilisez les filtres \"Année début\" et \"Année fin\" ci-dessus pour modifier la période analysée."
+            f"</span>",
             unsafe_allow_html=True
         )
 
